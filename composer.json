@@ -1,0 +1,19 @@
+{
+  "name": "voxnova/sdk",
+  "description": "SDK PHP de la plateforme développeurs VoxNova : API REST, instructions vocales (dial plan en code), vérification des webhooks",
+  "type": "library",
+  "license": "MIT",
+  "keywords": ["voip", "sip", "telephony", "webhooks", "ivr", "voxnova"],
+  "homepage": "https://github.com/damidani/voxnova",
+  "require": {
+    "php": ">=8.1",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": { "VoxNova\\": "src/" }
+  },
+  "scripts": {
+    "test": "php tests/run.php"
+  }
+}
