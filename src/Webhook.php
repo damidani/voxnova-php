@@ -32,6 +32,18 @@ final class Webhook
     }
 
     /**
+     * Événements d'entreprise ou de revendeur (call.completed, sms.status) :
+     * X-VoxNova-Signature: sha256=<HMAC-SHA256 du corps brut avec le secret du webhook>.
+     */
+    public static function verifyEvent(string $secret, string $rawBody, ?string $header): bool
+    {
+        if ($header === null || !str_starts_with($header, 'sha256=')) {
+            return false;
+        }
+        return hash_equals(hash_hmac('sha256', $rawBody, $secret), substr($header, 7));
+    }
+
+    /**
      * Lit et vérifie la requête courante (php://input). Répond 401 et arrête le script si la signature est invalide.
      * @return array<string, mixed> corps décodé : event, callId, direction, from, to, digits, dial, recording, vars…
      */
