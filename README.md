@@ -6,9 +6,32 @@ SDK PHP de la plateforme développeurs VoxNova (PHP 8.1+, extensions curl et jso
 composer require voxnova/sdk
 ```
 
-- `VoxNova\Client` : API REST v1 (applications, endpoints SIP, numéros, appels, enregistrements, journal).
+- `VoxNova\Client` : API REST (clé d'entreprise `vxk_…` ou clé revendeur `vxr_…`) : **SMS** (envoi, suivi de remise, crédits), webhooks, applications, endpoints SIP, numéros, appels, enregistrements, journal, **scénarios d'appel** (`flows`), utilisateurs, postes, files d'attente, groupes d'appel, serveurs vocaux, accès brut au panneau (`panel`) et **espace revendeur** (`reseller`, `forOrganization()`).
 - `VoxNova\VoiceResponse` : instructions renvoyées par votre webhook (dial plan en code).
-- `VoxNova\Webhook` : vérification de l'en-tête `X-VoxNova-Signature`.
+- `VoxNova\Webhook` : vérification des rappels des applications vocales (`verifySignature`) et des webhooks d'entreprise ou de revendeur (`verifyEvent` : `sms.status`, `call.completed`).
+
+## SMS, webhooks, revendeur
+
+```php
+// SMS : envoi, suivi de remise, crédits
+$sms = $vx->sms->send(['to' => '0612345678', 'text' => 'Votre code : 1234', 'tag' => 'otp', 'sender' => 'hCloud']);
+$etat = $vx->sms->get($sms['id']);          // status : queued → sent → delivered ; events[]
+['balance' => $solde, 'monthlyLeft' => $reste] = $vx->sms->balance();
+
+// Revendeur : agir au nom d'un client (clé vxr_…)
+$reseller = new Client(getenv('VXR_KEY'), 'https://api.exemple.fr');
+$client = $reseller->forOrganization('<id du client>');
+$client->extensions->create(['number' => '1001', 'displayName' => 'Accueil']);
+$client->flows->update($flowId, ['name' => 'Standard', 'graph' => $graph]);
+$reseller->reseller->applySmsPack('<id du client>', '<id du pack>');
+
+// Webhook sms.status (signature sha256 sur le corps brut)
+$raw = file_get_contents('php://input');
+if (!Webhook::verifyEvent(getenv('WH_SECRET'), $raw, $_SERVER['HTTP_X_VOXNOVA_SIGNATURE'] ?? null)) { http_response_code(401); exit; }
+$event = json_decode($raw, true);           // ['event' => 'sms.status', 'data' => ['status' => 'delivered', …]]
+```
+
+Documentation interactive : `/api/v1/docs` (Swagger) ; guide : chapitres 19 et 30.
 
 ## API REST
 

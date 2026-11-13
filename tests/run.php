@@ -70,13 +70,52 @@ if ($signed = getenv('VX_SIGNED')) {
     ok(Webhook::verifySignature((string) getenv('VX_SIGNED_SECRET'), $b, $h), 'signature produite par la plateforme acceptée');
 }
 
+echo "Webhooks d'entreprise et de revendeur\n";
+$evBody = '{"event":"sms.status","data":{"status":"delivered"}}';
+$evSig = 'sha256=' . hash_hmac('sha256', $evBody, 'whsec');
+ok(Webhook::verifyEvent('whsec', $evBody, $evSig), 'signature sha256 valide acceptée');
+ok(!Webhook::verifyEvent('autre', $evBody, $evSig) && !Webhook::verifyEvent('whsec', $evBody . ' ', $evSig) && !Webhook::verifyEvent('whsec', $evBody, null), 'signature fausse refusée');
+
 echo "Client\n";
 try {
     new Client('mauvaise', 'https://x');
     ok(false, 'clé invalide refusée');
 } catch (InvalidArgumentException) {
-    ok(true, 'clé sans préfixe vxk_ refusée');
+    ok(true, 'clé sans préfixe vxk_ / vxr_ refusée');
 }
+ok((new Client('vxr_abc', 'https://x'))->forOrganization('org_1') instanceof Client, 'clé revendeur et forOrganization acceptées');
+
+echo "Requêtes (serveur local)\n";
+$tmp = sys_get_temp_dir() . '/vx-sdk-' . getmypid() . '.log';
+$router = sys_get_temp_dir() . '/vx-router-' . getmypid() . '.php';
+file_put_contents($router, '<?php file_put_contents(' . var_export($tmp, true) . ', json_encode([\'m\' => $_SERVER[\'REQUEST_METHOD\'], \'u\' => $_SERVER[\'REQUEST_URI\'], \'org\' => $_SERVER[\'HTTP_X_ORGANIZATION\'] ?? null, \'auth\' => $_SERVER[\'HTTP_AUTHORIZATION\'] ?? null, \'b\' => file_get_contents(\'php://input\')]) . "\\n", FILE_APPEND); header(\'Content-Type: application/json\'); echo json_encode([\'ok\' => true]);');
+$port = 18900 + getmypid() % 500;
+$proc = proc_open([PHP_BINARY, '-S', "127.0.0.1:$port", $router], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
+usleep(600000);
+$calls = static function () use ($tmp): array {
+    return array_map(static fn ($l) => json_decode($l, true), array_filter(explode("\n", (string) @file_get_contents($tmp))));
+};
+$vxl = new Client('vxk_local', "http://127.0.0.1:$port");
+$vxl->sms->send(['to' => '0612345678', 'text' => 'Bonjour', 'tag' => 'bienvenue']);
+$c = $calls();
+$last = end($c);
+ok($last['m'] === 'POST' && $last['u'] === '/api/v1/sms' && json_decode($last['b'], true)['tag'] === 'bienvenue' && $last['org'] === null, 'sms->send : POST /api/v1/sms avec les champs');
+$vxl->sms->list('delivered', null, 'bienvenue');
+$c = $calls();
+ok(str_contains(end($c)['u'], 'status=delivered') && str_contains(end($c)['u'], 'tag=bienvenue'), 'sms->list : filtres');
+$vxr = (new Client('vxr_local', "http://127.0.0.1:$port"))->forOrganization('org_1');
+$vxr->flows->update('f1', ['name' => 'Accueil', 'graph' => ['nodes' => [], 'edges' => []]]);
+$c = $calls();
+ok(end($c)['m'] === 'PUT' && end($c)['u'] === '/api/centrex/flows/f1' && end($c)['org'] === 'org_1', 'flows->update : PUT avec X-Organization');
+$vxr->users->update('u1', ['name' => 'Nouveau']);
+$c = $calls();
+ok(end($c)['m'] === 'PATCH', 'users->update : PATCH');
+$vxr->reseller->applySmsPack('org_1', 'pack_1');
+$c = $calls();
+ok(end($c)['u'] === '/api/reseller/clients/org_1/sms/pack' && json_decode(end($c)['b'], true) === ['packId' => 'pack_1'], 'reseller->applySmsPack');
+proc_terminate($proc);
+@unlink($tmp);
+@unlink($router);
 
 $url = getenv('VX_API_URL');
 $key = getenv('VX_KEY');
