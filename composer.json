@@ -1,6 +1,6 @@
 {
   "name": "voxnova/sdk",
-  "description": "SDK PHP de la plateforme développeurs VoxNova : API REST, instructions vocales (dial plan en code), vérification des webhooks",
+  "description": "SDK PHP de la plateforme VoxNova : API REST (SMS, endpoints, numéros, appels, scénarios d'appel, espace revendeur), instructions vocales, vérification des webhooks",
   "type": "library",
   "license": "MIT",
   "keywords": ["voip", "sip", "telephony", "webhooks", "ivr", "voxnova"],
