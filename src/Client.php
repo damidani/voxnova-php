@@ -47,7 +47,7 @@ final class Client
 
     private string $baseUrl;
 
-    public function __construct(private string $apiKey, string $baseUrl, private int $timeoutSec = 15, private ?string $organization = null)
+    public function __construct(private string $apiKey, string $baseUrl, private int $timeoutSec = 15, private ?string $organization = null, private ?string $user = null, private bool $autoIdempotency = false, private int $maxRetries = 2)
     {
         if (!str_starts_with($apiKey, 'vxk_') && !str_starts_with($apiKey, 'vxr_')) {
             throw new \InvalidArgumentException('Clé API vxk_… (entreprise) ou vxr_… (revendeur) requise');
@@ -81,7 +81,19 @@ final class Client
     /** Revendeur : même clé vxr_, mais au nom d'un de vos clients (en-tête X-Organization). */
     public function forOrganization(string $organization): self
     {
-        return new self($this->apiKey, $this->baseUrl, $this->timeoutSec, $organization);
+        return new self($this->apiKey, $this->baseUrl, $this->timeoutSec, $organization, $this->user, $this->autoIdempotency, $this->maxRetries);
+    }
+
+    /** Revendeur : au nom d'un utilisateur précis du client (identifiant ou e-mail) : routes /api/me/… (après forOrganization). */
+    public function asUser(string $user): self
+    {
+        return new self($this->apiKey, $this->baseUrl, $this->timeoutSec, $this->organization, $user, $this->autoIdempotency, $this->maxRetries);
+    }
+
+    /** Écritures : Idempotency-Key aléatoire et nouvel essai après une coupure ou une erreur 502/503/504, sans doublon. */
+    public function withAutoIdempotency(bool $on = true): self
+    {
+        return new self($this->apiKey, $this->baseUrl, $this->timeoutSec, $this->organization, $this->user, $on, $this->maxRetries);
     }
 
     /**
@@ -90,7 +102,7 @@ final class Client
      * @param array<string, scalar|null> $query
      * @return mixed
      */
-    public function request(string $method, string $path, ?array $body = null, array $query = [], bool $multipart = false): mixed
+    public function request(string $method, string $path, ?array $body = null, array $query = [], bool $multipart = false, ?string $idempotencyKey = null): mixed
     {
         $query = array_filter($query, static fn ($v) => $v !== null);
         $query = array_map(static fn ($v) => is_bool($v) ? ($v ? 'true' : 'false') : $v, $query);
@@ -99,6 +111,15 @@ final class Client
         if ($this->organization !== null && $this->organization !== '') {
             $headers[] = 'X-Organization: ' . $this->organization;
         }
+        if ($this->user !== null && $this->user !== '') {
+            $headers[] = 'X-User: ' . $this->user;
+        }
+        $write = !in_array($method, ['GET', 'HEAD'], true);
+        $key = $idempotencyKey ?? ($write && $this->autoIdempotency ? bin2hex(random_bytes(16)) : null);
+        if ($key !== null) {
+            $headers[] = 'Idempotency-Key: ' . $key;
+        }
+        $retries = $key !== null && ($idempotencyKey !== null || $this->autoIdempotency) ? $this->maxRetries : 0;
         $ch = curl_init($url);
         $opts = [
             CURLOPT_CUSTOMREQUEST => $method,
@@ -116,13 +137,22 @@ final class Client
         }
         $opts[CURLOPT_HTTPHEADER] = $headers;
         curl_setopt_array($ch, $opts);
-        $raw = curl_exec($ch);
+        $attempt = 0;
+        while (true) {
+            $raw = curl_exec($ch);
+            $status = $raw === false ? 0 : (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            if (($raw === false || in_array($status, [502, 503, 504], true)) && $attempt < $retries) {
+                usleep(300000 * (2 ** $attempt));
+                $attempt++;
+                continue;
+            }
+            break;
+        }
         if ($raw === false) {
             $err = curl_error($ch);
             curl_close($ch);
             throw new VoxNovaException('Connexion impossible : ' . $err, 0, null);
         }
-        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
         $data = $raw === '' ? null : json_decode((string) $raw, true);
         if ($status < 200 || $status >= 300) {

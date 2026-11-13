@@ -119,6 +119,10 @@ ok(end($c)['m'] === 'POST' && end($c)['u'] === '/api/v1/porting', 'porting->crea
 $vxl->porting->cancel('p1');
 $c = $calls();
 ok(end($c)['u'] === '/api/v1/porting/p1/cancel', 'porting->cancel');
+$vxu = (new Client('vxr_local', "http://127.0.0.1:$port"))->forOrganization('org_1')->asUser('u@exemple.fr')->withAutoIdempotency();
+$vxu->sms->send(['to' => '0612345678', 'text' => 'x']);
+$c = $calls();
+ok(end($c)['u'] === '/api/v1/sms', 'requête avec X-User et clé d’idempotence');
 proc_terminate($proc);
 @unlink($tmp);
 @unlink($router);
