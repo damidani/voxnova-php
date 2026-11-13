@@ -32,6 +32,7 @@ final class Client
     public readonly Resources\Logs $logs;
     public readonly Resources\Sms $sms;
     public readonly Resources\Webhooks $webhooks;
+    public readonly Resources\Porting $porting;
     public readonly Resources\Panel $panel;
     public readonly Resources\Flows $flows;
     public readonly Resources\Crud $users;
@@ -62,6 +63,7 @@ final class Client
         $this->logs = new Resources\Logs($this);
         $this->sms = new Resources\Sms($this);
         $this->webhooks = new Resources\Webhooks($this);
+        $this->porting = new Resources\Porting($this);
         $this->panel = new Resources\Panel($this);
         $this->flows = new Resources\Flows($this);
         $this->users = new Resources\Crud($this, '/api/org/users', 'PATCH');

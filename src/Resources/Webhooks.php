@@ -15,7 +15,7 @@ final class Webhooks extends Resource
 
     /**
      * Le secret de signature n'est renvoyé qu'à la création.
-     * @param list<'call.completed'|'sms.status'> $events
+     * @param list<'call.completed'|'sms.status'|'porting.status'> $events
      * @return array<string, mixed>
      */
     public function create(string $url, array $events = ['sms.status']): array
