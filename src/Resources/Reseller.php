@@ -37,6 +37,22 @@ final class Reseller extends Resource
         return $this->client->request('PATCH', '/api/reseller/clients/' . self::id($id), $changes);
     }
 
+    /**
+     * Lien de connexion automatique au panneau du client (usage unique, 60 s par défaut).
+     * @param array{user?: string, next?: string, ttlSeconds?: int} $options
+     * @return array{url: string, expiresAt: string, expiresIn: int, user: array<string, mixed>}
+     */
+    public function loginLink(string $clientId, array $options = []): array
+    {
+        return $this->client->request('POST', '/api/reseller/clients/' . self::id($clientId) . '/login-link', $options);
+    }
+
+    /** Fin de contrat : abonnements annulés, compte suspendu (données conservées). @return array<string, mixed> */
+    public function terminate(string $clientId): array
+    {
+        return $this->client->request('POST', '/api/reseller/clients/' . self::id($clientId) . '/terminate', []);
+    }
+
     /** @return list<array<string, mixed>> */
     public function smsPacks(): array
     {
