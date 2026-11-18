@@ -44,6 +44,10 @@ final class Client
     public readonly Resources\Crud $timeConditions;
     public readonly Resources\Crud $conferences;
     public readonly Resources\Reseller $reseller;
+    /** Toutes les routes de l'API, rangées comme leurs chemins : $vx->api->org->users->get($id). Généré depuis la spécification. */
+    public readonly Api\Root $api;
+    /** @var list<array<string,mixed>>|null */
+    private static ?array $operations = null;
 
     private string $baseUrl;
 
@@ -76,6 +80,7 @@ final class Client
         $this->timeConditions = new Resources\Crud($this, '/api/centrex/time-conditions');
         $this->conferences = new Resources\Crud($this, '/api/centrex/conferences');
         $this->reseller = new Resources\Reseller($this);
+        $this->api = new Api\Root($this);
     }
 
     /** Revendeur : même clé vxr_, mais au nom d'un de vos clients (en-tête X-Organization). */
@@ -107,7 +112,7 @@ final class Client
         $query = array_filter($query, static fn ($v) => $v !== null);
         $query = array_map(static fn ($v) => is_bool($v) ? ($v ? 'true' : 'false') : $v, $query);
         $url = $this->baseUrl . $path . ($query ? '?' . http_build_query($query) : '');
-        $headers = ['Authorization: Bearer ' . $this->apiKey, 'Accept: application/json', 'User-Agent: voxnova-php/1.1'];
+        $headers = ['Authorization: Bearer ' . $this->apiKey, 'Accept: application/json', 'User-Agent: voxnova-php/1.2'];
         if ($this->organization !== null && $this->organization !== '') {
             $headers[] = 'X-Organization: ' . $this->organization;
         }
@@ -160,5 +165,34 @@ final class Client
             throw new VoxNovaException($message, $status, $data ?? $raw);
         }
         return $data;
+    }
+
+    /**
+     * Catalogue des opérations de l'API (identifiant, méthode, chemin, résumé, rubrique, paramètres, schéma du corps).
+     * @return list<array<string,mixed>>
+     */
+    public static function operations(): array
+    {
+        return self::$operations ??= json_decode((string) file_get_contents(__DIR__ . '/operations.json'), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Appel d'une opération par son identifiant : $vx->call('org.users.get', ['id' => 'u1']).
+     * @param array<string,string> $params paramètres du chemin
+     * @param array<string,mixed>|null $body
+     * @param array<string,scalar|null> $query
+     */
+    public function call(string $id, array $params = [], ?array $body = null, array $query = []): mixed
+    {
+        foreach (self::operations() as $op) {
+            if ($op['id'] !== $id) continue;
+            $path = preg_replace_callback('/:(\w+)/', static function (array $m) use ($params): string {
+                $v = (string) ($params[$m[1]] ?? '');
+                if ($v === '') throw new \InvalidArgumentException('Paramètre manquant : ' . $m[1]);
+                return rawurlencode($v);
+            }, (string) $op['path']);
+            return $this->request((string) $op['method'], (string) $path, $op['method'] === 'GET' ? null : ($body ?? ($op['method'] === 'DELETE' ? null : [])), $query, (bool) $op['multipart']);
+        }
+        throw new \InvalidArgumentException('Opération inconnue : ' . $id);
     }
 }

@@ -123,6 +123,27 @@ $vxu = (new Client('vxr_local', "http://127.0.0.1:$port"))->forOrganization('org
 $vxu->sms->send(['to' => '0612345678', 'text' => 'x']);
 $c = $calls();
 ok(end($c)['u'] === '/api/v1/sms', 'requête avec X-User et clé d’idempotence');
+// toutes les routes : une méthode générée par opération, et appel par identifiant
+$ops = Client::operations();
+$missing = [];
+foreach ($ops as $op) {
+    $parts = explode('.', $op['id']);
+    $method = array_pop($parts);
+    $obj = $vxr->api;
+    foreach ($parts as $p) $obj = $obj->{$p} ?? null;
+    if (!$obj || !method_exists($obj, $method)) $missing[] = $op['id'];
+}
+ok(count($ops) > 500 && !$missing, count($ops) . ' opérations, chacune avec sa méthode' . ($missing ? ' (manquantes : ' . implode(', ', $missing) . ')' : ''));
+$vxr->api->org->users->update('u 1', ['name' => 'Julie']);
+$c = $calls();
+ok(end($c)['m'] === 'PATCH' && end($c)['u'] === '/api/org/users/u%201' && end($c)['org'] === 'org_1', 'api->org->users->update : chemin et en-têtes');
+$vxr->api->centrex->cdr->list(['page' => 2]);
+$c = $calls();
+ok(end($c)['u'] === '/api/centrex/cdr?page=2', 'api->centrex->cdr->list : filtres');
+$vxr->call('centrex.flows.get', ['id' => 'f1']);
+$c = $calls();
+ok(end($c)['m'] === 'GET' && end($c)['u'] === '/api/centrex/flows/f1', 'call() par identifiant');
+try { $vxr->call('centrex.flows.get'); ok(false, 'paramètre manquant'); } catch (\InvalidArgumentException $e) { ok(str_contains($e->getMessage(), 'manquant'), 'call() : paramètre manquant refusé'); }
 proc_terminate($proc);
 @unlink($tmp);
 @unlink($router);

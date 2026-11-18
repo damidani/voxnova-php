@@ -57,6 +57,24 @@ try {
 }
 ```
 
+## Toute l’API : `$vx->api`
+
+Les **524 routes** de l’API (panneau client, espace revendeur, plateforme développeurs) sont disponibles et documentées, rangées comme leurs chemins. Elles sont générées depuis la spécification : tout ce que l’API sait faire est dans le SDK.
+
+```php
+$client = (new VoxNova\Client($cleRevendeur, 'https://api.exemple.fr'))->forOrganization($idClient);
+$users = $client->api->org->users->list();                       // GET /api/org/users
+$client->api->org->users->update($id, ['name' => 'Julie']);      // PATCH /api/org/users/:id
+$client->api->centrex->cdr->list(['page' => 2]);                  // GET /api/centrex/cdr?page=2
+$client->api->centrex->flows->simulate(['graph' => $graph]);      // POST /api/centrex/flows/simulate
+
+// par identifiant et catalogue des opérations (méthode, chemin, résumé, rubrique, schéma du corps)
+$client->call('org.extensions.get', ['id' => $id]);
+$ops = VoxNova\Client::operations();
+```
+
+Règle : `GET` d’une liste → `list`, d’un élément → `get`, `POST` → `create` (ou le nom de l’action : `invite`, `simulate`…), `PUT`/`PATCH` → `update`, `DELETE` → `delete`. Arguments : paramètres du chemin, puis le corps (`array`), puis les filtres (`array`).
+
 ## Webhook (dial plan en code)
 
 ```php
