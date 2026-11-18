@@ -10,6 +10,7 @@ final class Me
 {
     public readonly Me_2fa $_2fa;
     public readonly MeAi $ai;
+    public readonly MeCallContext $callContext;
     public readonly MeCalls $calls;
     public readonly MeCentrex $centrex;
     public readonly MeClickToCall $clickToCall;
@@ -27,6 +28,7 @@ final class Me
     {
         $this->_2fa = new Me_2fa($client);
         $this->ai = new MeAi($client);
+        $this->callContext = new MeCallContext($client);
         $this->calls = new MeCalls($client);
         $this->centrex = new MeCentrex($client);
         $this->clickToCall = new MeClickToCall($client);

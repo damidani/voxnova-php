@@ -11,6 +11,7 @@ final class V1
     public readonly V1Account $account;
     public readonly V1Applications $applications;
     public readonly V1Audio $audio;
+    public readonly V1CallContext $callContext;
     public readonly V1Callbacks $callbacks;
     public readonly V1Calls $calls;
     public readonly V1Cdr $cdr;
@@ -31,6 +32,7 @@ final class V1
         $this->account = new V1Account($client);
         $this->applications = new V1Applications($client);
         $this->audio = new V1Audio($client);
+        $this->callContext = new V1CallContext($client);
         $this->callbacks = new V1Callbacks($client);
         $this->calls = new V1Calls($client);
         $this->cdr = new V1Cdr($client);

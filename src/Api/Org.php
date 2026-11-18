@@ -13,6 +13,7 @@ final class Org
     public readonly OrgCallbackWidgets $callbackWidgets;
     public readonly OrgCallbacks $callbacks;
     public readonly OrgCalls $calls;
+    public readonly OrgCrm $crm;
     public readonly OrgDevices $devices;
     public readonly OrgDomain $domain;
     public readonly OrgExtensions $extensions;
@@ -49,6 +50,7 @@ final class Org
         $this->callbackWidgets = new OrgCallbackWidgets($client);
         $this->callbacks = new OrgCallbacks($client);
         $this->calls = new OrgCalls($client);
+        $this->crm = new OrgCrm($client);
         $this->devices = new OrgDevices($client);
         $this->domain = new OrgDomain($client);
         $this->extensions = new OrgExtensions($client);
